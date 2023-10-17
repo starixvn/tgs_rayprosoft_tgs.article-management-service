@@ -5,7 +5,7 @@ using Json.Patch;
 
 namespace Tgs.ArticleManagement.Clients;
 
-internal class ArticleManagementClient
+internal class ArticleManagementClient : IArticleManagementClient
 {
 	private static readonly JsonSerializerOptions _SerializerOptions = new(JsonSerializerDefaults.Web)
 	{
