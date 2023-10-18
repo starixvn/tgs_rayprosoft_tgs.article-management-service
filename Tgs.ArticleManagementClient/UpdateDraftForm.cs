@@ -5,5 +5,5 @@ public record UpdateDraftForm(
 {
 	public static readonly UpdateDraftForm Empty = new(
 		default!,
-		new Dictionary<string, Article>().AsReadOnly());
+		new Dictionary<string, Article>());
 }

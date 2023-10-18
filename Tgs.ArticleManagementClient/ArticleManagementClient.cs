@@ -107,9 +107,9 @@ internal class ArticleManagementClient : IArticleManagementClient
 	{
 		var patch = UpdateDraftForm.Empty.CreatePatch(updateData, _SerializerOptions);
 
-		_ = await _httpClient.PatchAsJsonAsync(
+		_ = await _httpClient.PatchAsync(
 			$"/draft/{formId}",
-			patch,
+			JsonContent.Create(patch),
 			cancellationToken)
 			.ToAsyncEnumerable()
 			.Do(response => response.EnsureSuccessStatusCode())

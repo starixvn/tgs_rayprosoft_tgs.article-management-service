@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Tgs.ArticleManagement.Clients</RootNamespace>
     <PackageId>Tgs.ArticleManagementClient</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Authors>Raypro</Authors>
     <Product>Tgs.ArticleManagementClient</Product>
     <Description>文章管理服務Client
