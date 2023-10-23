@@ -131,6 +131,7 @@ internal class TgsRepository : ITgsRepository
 					A.brand_id = {{brandId}}
 				""")
 			.OrderByDescending(row => row.UpdatedOn)
+			.Take(100)
 			.ToAsyncEnumerable()
 			.Select(row => new DraftFormListItem(
 				row.Id,
