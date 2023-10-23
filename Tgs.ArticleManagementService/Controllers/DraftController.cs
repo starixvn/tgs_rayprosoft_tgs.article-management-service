@@ -106,6 +106,20 @@ public class DraftController : ControllerBase
 		return deleteService.ExecuteAsync(command, HttpContext.RequestAborted);
 	}
 
+	[HttpHead("{brandId:Guid}", Name = "CountDraftForms")]
+	public async Task CountDraftFormsAsync(
+		[FromServices] IGetService<ListDraftFormsQuery, int> countService,
+		Guid brandId)
+	{
+		var query = new ListDraftFormsQuery(brandId);
+
+		var count = await countService.GetAsync(
+			query,
+			HttpContext.RequestAborted).ConfigureAwait(false);
+
+		Response.Headers.Add("Count", count.ToString());
+	}
+
 	[HttpGet("{brandId:Guid}", Name = "ListDraftForms")]
 	public IAsyncEnumerable<DraftListItemViewModel> ListDraftFormsAsync(
 		[FromServices] IQueryService<ListDraftFormsQuery, DraftFormListItem> queryService,

@@ -41,4 +41,22 @@ public class ListDraftFormsQueryServiceTests
         _ = fakeTgsRepository.Received(1)
             .ListDraftFormsAsync(Arg.Is(query.BrandId), Arg.Is(query.Skip));
     }
+
+    [Fact]
+    public async Task 列出文章及草稿_取得查詢筆數()
+    {
+        // Arrange
+        var fakeTgsRepository = Substitute.For<ITgsRepository>();
+
+        var sut = new ListDraftFormsQueryService(fakeTgsRepository);
+
+        var query = new ListDraftFormsQuery(Guid.NewGuid());
+
+        // Act
+        _ = await sut.GetAsync(query);
+
+        // Assert
+        _ = fakeTgsRepository.Received(1)
+            .CountDraftFormsAsync(Arg.Is(query.BrandId));
+    }
 }

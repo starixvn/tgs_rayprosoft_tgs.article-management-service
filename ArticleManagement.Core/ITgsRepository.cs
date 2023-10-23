@@ -19,4 +19,6 @@ public interface ITgsRepository
 	IAsyncEnumerable<ArticleForm> ListArticleFormsAsync(Guid brandId, CancellationToken cancellationToken = default);
 
 	IAsyncEnumerable<DraftFormListItem> ListDraftFormsAsync(Guid brandId, int skip = 0, CancellationToken cancellationToken = default);
+
+	ValueTask<int> CountDraftFormsAsync(Guid brandId, CancellationToken cancellationToken = default);
 }

@@ -57,26 +57,32 @@ internal class ArticleManagementClient : IArticleManagementClient
 				.ToAsyncEnumerable())
 			.FirstOrDefaultAsync(cancellationToken);
 
-	public IAsyncEnumerable<DraftListItem> ListDraftFormsAsync(
+	public async ValueTask<QueryResult<DraftListItem>> ListDraftFormsAsync(
 		Guid brandId,
 		int skip = 0,
 		CancellationToken cancellationToken = default)
 	{
-		var requestPath = skip > 0
-			? $"/draft/{brandId}?skip={skip}"
-			: $"/draft/{brandId}";
+		var totalCount = await CountDraftFormsAsync(
+			brandId,
+			cancellationToken).ConfigureAwait(false);
 
-		return _httpClient.GetAsync(
-			requestPath,
-			HttpCompletionOption.ResponseHeadersRead,
-			cancellationToken)
-			.ToAsyncEnumerable()
-			.Do(response => response.EnsureSuccessStatusCode())
-			.SelectMany(response => response.Content
-				.ReadFromJsonAsync<IAsyncEnumerable<DraftListItem>>(_SerializerOptions, cancellationToken)
+		var remainingCount = totalCount - skip;
+		var pages = (int)Math.Ceiling(remainingCount / 100D);
+
+		return new QueryResult<DraftListItem>(
+			totalCount,
+			AsyncEnumerable.Range(0, pages)
+			.SelectMany(idx => _httpClient.GetAsync(
+				$"/draft/{brandId}?skip={skip + idx * 100}",
+				HttpCompletionOption.ResponseHeadersRead,
+				cancellationToken)
 				.ToAsyncEnumerable()
-				.Where(items => items is not null)
-				.SelectMany(items => items!));
+				.Do(response => response.EnsureSuccessStatusCode())
+				.SelectMany(response => response.Content
+					.ReadFromJsonAsync<IAsyncEnumerable<DraftListItem>>(_SerializerOptions, cancellationToken)
+					.ToAsyncEnumerable()
+					.Where(items => items is not null)
+					.SelectMany(items => items!))));
 	}
 
 	public IAsyncEnumerable<ArticleListItem> ListArticleFormsAsync(
@@ -134,4 +140,20 @@ internal class ArticleManagementClient : IArticleManagementClient
 			.Do(response => response.EnsureSuccessStatusCode())
 			.ToListAsync(cancellationToken: cancellationToken)
 			.ConfigureAwait(false);
+
+	internal ValueTask<int> CountDraftFormsAsync(
+		Guid brandId,
+		CancellationToken cancellationToken = default)
+		=> _httpClient.SendAsync(
+			new HttpRequestMessage(HttpMethod.Head, $"/draft/{brandId}"),
+			HttpCompletionOption.ResponseHeadersRead,
+			cancellationToken)
+			.ToAsyncEnumerable()
+			.Do(response => response.EnsureSuccessStatusCode())
+			.SelectMany(response => response.Headers
+				.GetValues("Count")
+				.Take(1)
+				.Select(value => int.Parse(value))
+				.ToAsyncEnumerable())
+			.FirstAsync(cancellationToken);
 }

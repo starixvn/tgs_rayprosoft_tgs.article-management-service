@@ -2,7 +2,9 @@
 
 namespace Tgs.ArticleManagement.ApplicationServices;
 
-internal class ListDraftFormsQueryService : IQueryService<ListDraftFormsQuery, DraftFormListItem>
+internal class ListDraftFormsQueryService
+	: IQueryService<ListDraftFormsQuery, DraftFormListItem>
+	, IGetService<ListDraftFormsQuery, int>
 {
 	private readonly ITgsRepository _tgsRepository;
 
@@ -13,4 +15,7 @@ internal class ListDraftFormsQueryService : IQueryService<ListDraftFormsQuery, D
 
 	public IAsyncEnumerable<DraftFormListItem> QueryAsync(ListDraftFormsQuery query, CancellationToken cancellationToken = default)
 		=> _tgsRepository.ListDraftFormsAsync(query.BrandId, query.Skip, cancellationToken);
+
+	public ValueTask<int> GetAsync(ListDraftFormsQuery query, CancellationToken cancellationToken = default)
+		=> _tgsRepository.CountDraftFormsAsync(query.BrandId, cancellationToken);
 }

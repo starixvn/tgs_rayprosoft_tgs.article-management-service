@@ -10,7 +10,7 @@ public interface IArticleManagementClient
 
 	IAsyncEnumerable<ArticleListItem> ListArticleFormsAsync(Guid brandId, CancellationToken cancellationToken = default);
 
-	IAsyncEnumerable<DraftListItem> ListDraftFormsAsync(Guid brandId, int skip = 0, CancellationToken cancellationToken = default);
+	ValueTask<QueryResult<DraftListItem>> ListDraftFormsAsync(Guid brandId, int skip = 0, CancellationToken cancellationToken = default);
 
 	ValueTask PublishDraftAsync(Guid fromId, DateOnly publishDate, CancellationToken cancellationToken = default);
 

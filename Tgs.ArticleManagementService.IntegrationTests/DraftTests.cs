@@ -12,9 +12,9 @@ using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using NSubstitute;
 using Tgs.ArticleManagement;
 using Tgs.ArticleManagement.Clients;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Tgs.ArticleManagementService.IntegrationTests;
@@ -352,15 +352,15 @@ public class DraftTests
             .Reverse();
 
         // Act
-        var actual = await sut.ListDraftFormsAsync(brandId).ToArrayAsync();
+        var actual = await sut.ListDraftFormsAsync(brandId);
 
         // Assert
         Assert.NotNull(actual);
-        Assert.Equal(expected, actual);
+        Assert.Equal(expected, await actual.Items.ToArrayAsync());
     }
 
     [Fact]
-    public async Task 列表草稿及文章_一次最多回傳100筆資料()
+    public async Task 列表草稿及文章_回傳所有資料()
     {
         // Arrange
         await using var web = ArticleManagementTestHost.Instance
@@ -409,11 +409,15 @@ public class DraftTests
         _ = await dbContext.SaveChangesAsync();
 
         // Act
-        var actual = await sut.ListDraftFormsAsync(brandId).ToArrayAsync();
+        var actual = await sut.ListDraftFormsAsync(brandId);
+        var items = await actual.Items.ToArrayAsync();
 
         // Assert
         Assert.NotNull(actual);
-        Assert.Equal(100, actual.Length);
+        Assert.Equal(110, items.Length);
+        rows.Select(row => row.Id).ToArray()
+            .ToExpectedObject()
+            .ShouldMatch(items.Select(item => item.Id).ToArray());
     }
 
     [Fact]
@@ -478,12 +482,58 @@ public class DraftTests
             .Reverse();
 
         // Act
-        var actual = await sut.ListDraftFormsAsync(brandId, 10).Take(10).ToArrayAsync();
+        var result = await sut.ListDraftFormsAsync(brandId, 10);
+        var actual = await result.Items.Take(10).ToArrayAsync();
 
         // Assert
         Assert.NotNull(actual);
         Assert.Equal(expected, actual);
         Assert.Equal(rows[99].Id, actual[0].Id);
+    }
+
+    [Fact]
+    public async Task 列表草稿及文章_取得查詢筆數()
+    {
+        // Arrange
+        var fakeTgsRepository = Substitute.For<ITgsRepository>();
+
+        await using var web = ArticleManagementTestHost.Instance
+            .WithWebHostBuilder(hostBuilder => hostBuilder
+                .ConfigureLogging(logging => logging
+                    .AddXUnit(_testOutputHelper))
+                .ConfigureServices(services => services
+                    .AddHttpClientLoggingHandler()
+                    .Replace(ServiceDescriptor.Singleton(sp =>
+                    {
+                        var dbContextOptionsBuilder = new DbContextOptionsBuilder<TgsContext>();
+                        _ = dbContextOptionsBuilder
+                            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                            .ConfigureWarnings(x => x.Ignore(
+                                InMemoryEventId.TransactionIgnoredWarning))
+                            .ReplaceService<
+                                IQueryTranslationPreprocessorFactory,
+                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+
+                        return new TgsContext(dbContextOptionsBuilder.Options);
+                    }))
+                    .AddSingleton(fakeTgsRepository)));
+
+        var httpClient = web.CreateClient();
+
+        var sut = new ArticleManagementClient(httpClient);
+
+        var brandId = Guid.NewGuid();
+
+        _ = fakeTgsRepository.CountDraftFormsAsync(
+            Arg.Is(brandId),
+            Arg.Any<CancellationToken>())
+            .Returns(123);
+
+        // Act
+        var actual = await sut.CountDraftFormsAsync(brandId);
+
+        // Assert
+        Assert.Equal(123, actual);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "<暫止>")]

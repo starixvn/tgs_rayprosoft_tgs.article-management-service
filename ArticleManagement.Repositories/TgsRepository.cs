@@ -214,6 +214,23 @@ internal class TgsRepository : ITgsRepository
 		_ = await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 	}
 
+	public async ValueTask<int> CountDraftFormsAsync(Guid brandId, CancellationToken cancellationToken = default)
+		=> await _dbContext.Set<DraftFormViewRow>()
+			.FromSqlInterpolated($$"""
+				SELECT
+					1
+				FROM
+					dbo.draft_forms AS D
+					FULL JOIN
+					dbo.article_forms AS A ON D.id = A.id
+				WHERE
+					D.brand_id = {{brandId}}
+					AND
+					A.brand_id = {{brandId}}
+				""")
+			.CountAsync(cancellationToken)
+			.ConfigureAwait(false);
+
 	private static Expression MakeMemberAccess(object dataRow, JsonPointer path)
 	{
 		Expression expression = Expression.Constant(dataRow);
