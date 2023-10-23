@@ -12,5 +12,5 @@ internal class ListDraftFormsQueryService : IQueryService<ListDraftFormsQuery, D
 	}
 
 	public IAsyncEnumerable<DraftFormListItem> QueryAsync(ListDraftFormsQuery query, CancellationToken cancellationToken = default)
-		=> _tgsRepository.ListDraftFormsAsync(query.BrandId, cancellationToken);
+		=> _tgsRepository.ListDraftFormsAsync(query.BrandId, query.Skip, cancellationToken);
 }

@@ -109,9 +109,10 @@ public class DraftController : ControllerBase
 	[HttpGet("{brandId:Guid}", Name = "ListDraftForms")]
 	public IAsyncEnumerable<DraftListItemViewModel> ListDraftFormsAsync(
 		[FromServices] IQueryService<ListDraftFormsQuery, DraftFormListItem> queryService,
-		Guid brandId)
+		Guid brandId,
+		[FromQuery(Name = "skip")] int skip = 0)
 	{
-		var query = new ListDraftFormsQuery(brandId);
+		var query = new ListDraftFormsQuery(brandId, skip);
 
 		return queryService.QueryAsync(query, HttpContext.RequestAborted)
 			.Select(item => new DraftListItemViewModel

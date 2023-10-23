@@ -59,9 +59,15 @@ internal class ArticleManagementClient : IArticleManagementClient
 
 	public IAsyncEnumerable<DraftListItem> ListDraftFormsAsync(
 		Guid brandId,
+		int skip = 0,
 		CancellationToken cancellationToken = default)
-		=> _httpClient.GetAsync(
-			$"/draft/{brandId}",
+	{
+		var requestPath = skip > 0
+			? $"/draft/{brandId}?skip={skip}"
+			: $"/draft/{brandId}";
+
+		return _httpClient.GetAsync(
+			requestPath,
 			HttpCompletionOption.ResponseHeadersRead,
 			cancellationToken)
 			.ToAsyncEnumerable()
@@ -71,6 +77,7 @@ internal class ArticleManagementClient : IArticleManagementClient
 				.ToAsyncEnumerable()
 				.Where(items => items is not null)
 				.SelectMany(items => items!));
+	}
 
 	public IAsyncEnumerable<ArticleListItem> ListArticleFormsAsync(
 		Guid brandId,

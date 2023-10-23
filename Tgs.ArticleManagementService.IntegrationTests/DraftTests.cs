@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Tgs.ArticleManagement;
 using Tgs.ArticleManagement.Clients;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Tgs.ArticleManagementService.IntegrationTests;
@@ -356,6 +357,133 @@ public class DraftTests
         // Assert
         Assert.NotNull(actual);
         Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task 列表草稿及文章_一次最多回傳100筆資料()
+    {
+        // Arrange
+        await using var web = ArticleManagementTestHost.Instance
+            .WithWebHostBuilder(hostBuilder => hostBuilder
+                .ConfigureLogging(logging => logging
+                    .AddXUnit(_testOutputHelper))
+                .ConfigureServices(services => services
+                    .AddHttpClientLoggingHandler()
+                    .Replace(ServiceDescriptor.Singleton(sp =>
+                    {
+                        var dbContextOptionsBuilder = new DbContextOptionsBuilder<TgsContext>();
+                        _ = dbContextOptionsBuilder
+                            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                            .ConfigureWarnings(x => x.Ignore(
+                                InMemoryEventId.TransactionIgnoredWarning))
+                            .ReplaceService<
+                                IQueryTranslationPreprocessorFactory,
+                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+
+                        return new TgsContext(dbContextOptionsBuilder.Options);
+                    }))));
+
+        var httpClient = web.CreateClient();
+
+        var dbContext = web.Services.GetRequiredService<TgsContext>();
+
+        var sut = new ArticleManagementClient(httpClient);
+
+        var brandId = Guid.NewGuid();
+
+        var currentTime = DateTime.UtcNow;
+        var rows = Enumerable.Range(0, 110)
+            .Select(n => new DraftFormViewRow
+            {
+                Id = Guid.NewGuid(),
+                BrandId = brandId,
+                Description = "desc",
+                Modifier = "system",
+                Status = nameof(ArticleStatus.Draft),
+                UpdatedOn = currentTime.AddMinutes(n)
+            })
+            .ToArray();
+
+        await dbContext.Set<DraftFormViewRow>().AddRangeAsync(rows);
+
+        _ = await dbContext.SaveChangesAsync();
+
+        // Act
+        var actual = await sut.ListDraftFormsAsync(brandId).ToArrayAsync();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(100, actual.Length);
+    }
+
+    [Fact]
+    public async Task 列表草稿及文章_透過skip取得分頁資料()
+    {
+        // Arrange
+        await using var web = ArticleManagementTestHost.Instance
+            .WithWebHostBuilder(hostBuilder => hostBuilder
+                .ConfigureLogging(logging => logging
+                    .AddXUnit(_testOutputHelper))
+                .ConfigureServices(services => services
+                    .AddHttpClientLoggingHandler()
+                    .Replace(ServiceDescriptor.Singleton(sp =>
+                    {
+                        var dbContextOptionsBuilder = new DbContextOptionsBuilder<TgsContext>();
+                        _ = dbContextOptionsBuilder
+                            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                            .ConfigureWarnings(x => x.Ignore(
+                                InMemoryEventId.TransactionIgnoredWarning))
+                            .ReplaceService<
+                                IQueryTranslationPreprocessorFactory,
+                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+
+                        return new TgsContext(dbContextOptionsBuilder.Options);
+                    }))));
+
+        var httpClient = web.CreateClient();
+
+        var dbContext = web.Services.GetRequiredService<TgsContext>();
+
+        var sut = new ArticleManagementClient(httpClient);
+
+        var brandId = Guid.NewGuid();
+
+        var currentTime = DateTime.UtcNow;
+        var rows = Enumerable.Range(0, 110)
+            .Select(n => new DraftFormViewRow
+            {
+                Id = Guid.NewGuid(),
+                BrandId = brandId,
+                Description = "desc",
+                Modifier = "system",
+                Status = nameof(ArticleStatus.Draft),
+                UpdatedOn = currentTime.AddMinutes(n)
+            })
+            .ToArray();
+
+        await dbContext.Set<DraftFormViewRow>().AddRangeAsync(rows);
+
+        _ = await dbContext.SaveChangesAsync();
+
+        var expected = rows.Take(^20..^10)
+            .Select(row => new DraftListItem(
+                row.Id,
+                row.Description,
+                row.Modifier,
+                row.PublishDate,
+                Enum.Parse<ArticleStatus>(row.Status),
+                row.CreatedOn,
+                row.UpdatedOn))
+            .ToArray()
+            .Reverse();
+
+        // Act
+        var actual = await sut.ListDraftFormsAsync(brandId, 10).Take(10).ToArrayAsync();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(expected, actual);
+        Assert.Equal(rows[99].Id, actual[0].Id);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "EF1001:Internal EF Core API usage.", Justification = "<暫止>")]

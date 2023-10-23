@@ -109,7 +109,7 @@ internal class TgsRepository : ITgsRepository
 				row.Modifier,
 				row.UpdatedOn));
 
-	public IAsyncEnumerable<DraftFormListItem> ListDraftFormsAsync(Guid brandId, CancellationToken cancellationToken = default)
+	public IAsyncEnumerable<DraftFormListItem> ListDraftFormsAsync(Guid brandId, int skip = 0, CancellationToken cancellationToken = default)
 		=> _dbContext.Set<DraftFormViewRow>()
 			.FromSqlInterpolated($$"""
 				SELECT
@@ -131,6 +131,7 @@ internal class TgsRepository : ITgsRepository
 					A.brand_id = {{brandId}}
 				""")
 			.OrderByDescending(row => row.UpdatedOn)
+			.Skip(skip)
 			.Take(100)
 			.ToAsyncEnumerable()
 			.Select(row => new DraftFormListItem(
