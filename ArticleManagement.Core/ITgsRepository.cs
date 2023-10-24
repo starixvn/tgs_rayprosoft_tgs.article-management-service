@@ -14,7 +14,7 @@ public interface ITgsRepository
 
 	ValueTask UpsertArticleFormAsync(ArticleForm articleForm, CancellationToken cancellationToken = default);
 
-	ValueTask SetArticleStatusAsync(Guid formId, ArticleStatus status, CancellationToken cancellationToken = default);
+	ValueTask SetArticleStatusAsync(Guid formId, ArticleStatus status, string modifier, CancellationToken cancellationToken = default);
 
 	IAsyncEnumerable<ArticleForm> ListArticleFormsAsync(Guid brandId, CancellationToken cancellationToken = default);
 

@@ -54,14 +54,11 @@ public class ArticleTests
         // Act
         await sut.RemoveArticleAsync(formId);
         var actualArticleRow = await dbContext.ArticleRows.FindAsync(formId);
-        var actualDraftRow = await dbContext.DraftRows.FindAsync(formId);
 
         // Assert
         Assert.NotNull(actualArticleRow);
         Assert.Equal(nameof(ArticleStatus.Removed), actualArticleRow.Status);
-        Assert.NotNull(actualDraftRow);
-        Assert.Equal(nameof(ArticleStatus.Removed), actualDraftRow.Status);
-        Assert.Equal(modifier, actualDraftRow.Modifier);
+        Assert.Equal(modifier, actualArticleRow.Modifier);
     }
 
     [Fact]

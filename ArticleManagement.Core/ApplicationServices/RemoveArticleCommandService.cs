@@ -20,27 +20,10 @@ internal class RemoveArticleCommandService : ICommandService<RemoveArticleComman
 		if (article is null)
 			return;
 
-		var draft = await _tgsRepository.GetDraftFormAsync(
-			command.FormId,
-			cancellationToken).ConfigureAwait(false);
-
-		if (draft is null)
-			await _tgsRepository.CreateNewDraftAsync(
-				new DraftForm(
-					article.Id,
-					article.BrandId,
-					article.Description,
-					article.LocalizedArticles,
-					command.Modifier,
-					ArticleStatus.Removed,
-					null,
-					article.UpdatedOn,
-					DateTime.UtcNow),
-				cancellationToken).ConfigureAwait(false);
-
 		await _tgsRepository.SetArticleStatusAsync(
 			command.FormId,
 			ArticleStatus.Removed,
+			command.Modifier,
 			cancellationToken).ConfigureAwait(false);
 	}
 }

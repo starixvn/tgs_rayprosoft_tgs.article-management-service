@@ -177,7 +177,11 @@ internal class TgsRepository : ITgsRepository
 		_ = await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 	}
 
-	public async ValueTask SetArticleStatusAsync(Guid formId, ArticleStatus status, CancellationToken cancellationToken = default)
+	public async ValueTask SetArticleStatusAsync(
+		Guid formId,
+		ArticleStatus status,
+		string modifier,
+		CancellationToken cancellationToken = default)
 	{
 		var row = await _dbContext.ArticleRows.FindAsync(
 			new object?[] { formId },
@@ -187,6 +191,7 @@ internal class TgsRepository : ITgsRepository
 			return;
 
 		row.Status = status.ToString();
+		row.Modifier = modifier;
 
 		_ = await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 	}

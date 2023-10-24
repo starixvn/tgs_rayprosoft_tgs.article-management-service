@@ -33,7 +33,10 @@ public class RemoveArticleCommandServiceTests
 
         // Assert
         _ = fakeTgsRepository.Received(1)
-            .SetArticleStatusAsync(Arg.Is(command.FormId), Arg.Is(ArticleStatus.Removed));
+            .SetArticleStatusAsync(
+                Arg.Is(command.FormId),
+                Arg.Is(ArticleStatus.Removed),
+                Arg.Is(command.Modifier));
     }
 
     [Fact]
@@ -51,51 +54,9 @@ public class RemoveArticleCommandServiceTests
 
         // Assert
         _ = fakeTgsRepository.Received(0)
-            .SetArticleStatusAsync(Arg.Is(command.FormId), Arg.Is(ArticleStatus.Removed));
-    }
-
-    [Fact]
-    public async Task 如果沒有編輯中的草稿會建立一個草稿()
-    {
-        // Arrange
-        var fakeTgsRepository = Substitute.For<ITgsRepository>();
-
-        var sut = new RemoveArticleCommandService(fakeTgsRepository);
-
-        var command = new RemoveArticleCommand(Guid.NewGuid(), "tester");
-
-        var article = new ArticleForm(
-            command.FormId,
-            Guid.NewGuid(),
-            "description",
-            new Dictionary<string, Article>(),
-            ArticleStatus.Submission,
-            "test1",
-            DateTime.UtcNow);
-        _ = fakeTgsRepository.GetArticleFormAsync(Arg.Is(command.FormId))
-            .Returns(article);
-
-        var expected = new DraftForm(
-            command.FormId,
-            article.BrandId,
-            article.Description,
-            article.LocalizedArticles,
-            command.Modifier,
-            ArticleStatus.Removed,
-            null,
-            article.UpdatedOn,
-            DateTime.UtcNow);
-
-        // Act
-        await sut.ExecuteAsync(command);
-
-        // Assert
-        _ = fakeTgsRepository.Received(1)
-            .SetArticleStatusAsync(Arg.Is(command.FormId), Arg.Is(ArticleStatus.Removed));
-        _ = fakeTgsRepository.Received(1)
-            .CreateNewDraftAsync(Arg.Is<DraftForm>(form => expected.ToExpectedObject(
-                ctx => ctx
-                    .Ignore(f => f.UpdatedOn)
-                    .IgnoreEqualsOverride()).Matches(form)));
+            .SetArticleStatusAsync(
+                Arg.Is(command.FormId),
+                Arg.Is(ArticleStatus.Removed),
+                Arg.Is(command.Modifier));
     }
 }
