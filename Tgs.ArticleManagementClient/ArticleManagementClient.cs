@@ -156,4 +156,21 @@ internal class ArticleManagementClient : IArticleManagementClient
 				.Select(value => int.Parse(value))
 				.ToAsyncEnumerable())
 			.FirstAsync(cancellationToken);
+
+	internal async ValueTask DoPublishDraftsAsync(DateOnly? processDate, CancellationToken cancellationToken = default)
+		=> _ = await AsyncEnumerableEx.Return(processDate is null
+			? "/schedule/publish"
+			: $"/schedule/publish/{processDate.Value}")
+			.SelectMany(path => _httpClient.PostAsync(path, null, cancellationToken)
+				.ToAsyncEnumerable())
+			.Do(response => response.EnsureSuccessStatusCode())
+			.ToListAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+	internal async ValueTask DoRemoveExpiredDraftsAsync(CancellationToken cancellationToken = default)
+		=> _ = await _httpClient.PostAsync("/schedule/expired-draft", null, cancellationToken)
+			.ToAsyncEnumerable()
+			.Do(response => response.EnsureSuccessStatusCode())
+			.ToListAsync(cancellationToken: cancellationToken)
+			.ConfigureAwait(false);
 }

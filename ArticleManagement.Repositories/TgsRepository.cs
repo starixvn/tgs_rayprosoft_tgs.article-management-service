@@ -110,39 +110,44 @@ internal class TgsRepository : ITgsRepository
 				row.UpdatedOn));
 
 	public IAsyncEnumerable<DraftFormListItem> ListDraftFormsAsync(Guid brandId, int skip = 0, CancellationToken cancellationToken = default)
-		=> _dbContext.Set<DraftFormViewRow>()
-			.FromSqlInterpolated($$"""
-				SELECT
-					COALESCE(D.id, A.id) AS "id",
-					COALESCE(D.brand_id, A.brand_id) as "brand_id",
-					COALESCE(D.description, A.description) AS "description",
-					COALESCE(D.status, A.status) AS "status",
-					COALESCE(D.modifier, A.modifier) AS "modifier",
-					D.publish_date,
-					COALESCE(D.created_on, A.updated_on) AS "created_on",
-					COALESCE(D.updated_on, A.updated_on) AS "updated_on"
-				FROM
-					dbo.draft_forms AS D
-					FULL JOIN
-					dbo.article_forms AS A ON D.id = A.id
-				WHERE
-					D.brand_id = {{brandId}}
-					AND
-					A.brand_id = {{brandId}}
-				""")
-			.OrderByDescending(row => row.UpdatedOn)
-			.Skip(skip)
-			.Take(100)
-			.ToAsyncEnumerable()
-			.Select(row => new DraftFormListItem(
-				row.Id,
-				row.BrandId,
-				row.Description,
-				row.Modifier,
-				Enum.Parse<ArticleStatus>(row.Status),
-				row.PublishDate,
-				row.CreatedOn,
-				row.UpdatedOn));
+	{
+		var draftsSearchDate = DateTime.UtcNow.AddDays(-90D);
+
+		return _dbContext.Set<DraftFormViewRow>()
+				.FromSqlInterpolated($$"""
+					SELECT
+						COALESCE(D.id, A.id) AS "id",
+						COALESCE(D.brand_id, A.brand_id) as "brand_id",
+						COALESCE(D.description, A.description) AS "description",
+						COALESCE(D.status, A.status) AS "status",
+						COALESCE(D.modifier, A.modifier) AS "modifier",
+						D.publish_date,
+						COALESCE(D.created_on, A.updated_on) AS "created_on",
+						COALESCE(D.updated_on, A.updated_on) AS "updated_on"
+					FROM
+						dbo.draft_forms AS D
+						FULL JOIN
+						dbo.article_forms AS A ON D.id = A.id
+							AND D.updated_on > {{draftsSearchDate}}
+					WHERE
+						D.brand_id = {{brandId}}
+						AND
+						A.brand_id = {{brandId}}
+					""")
+				.OrderByDescending(row => row.UpdatedOn)
+				.Skip(skip)
+				.Take(100)
+				.ToAsyncEnumerable()
+				.Select(row => new DraftFormListItem(
+					row.Id,
+					row.BrandId,
+					row.Description,
+					row.Modifier,
+					Enum.Parse<ArticleStatus>(row.Status),
+					row.PublishDate,
+					row.CreatedOn,
+					row.UpdatedOn));
+	}
 
 	public async ValueTask PatchDraftAsync(DraftForm changeData, CancellationToken cancellationToken = default)
 	{
@@ -235,6 +240,33 @@ internal class TgsRepository : ITgsRepository
 				""")
 			.CountAsync(cancellationToken)
 			.ConfigureAwait(false);
+
+	public IAsyncEnumerable<DraftForm> ListWaitingSubmissionDraftsAsync(DateOnly publishDate, CancellationToken cancellationToken = default)
+		=> _dbContext.DraftRows
+			.Where(row => row.Status == nameof(ArticleStatus.WaitingSubmission)
+				&& row.PublishDate <= publishDate)
+			.ToAsyncEnumerable()
+			.Select(row => new DraftForm(
+				row.Id,
+				row.BrandId,
+				row.Description,
+				JsonSerializer.Deserialize<IReadOnlyDictionary<string, Article>>(
+					row.LocalizedArticles,
+					ArticleUtility.SerializerOptions)
+					?? new Dictionary<string, Article>().AsReadOnly(),
+				row.Modifier,
+				Enum.Parse<ArticleStatus>(row.Status),
+				row.PublishDate,
+				row.CreatedOn,
+				row.UpdatedOn));
+
+	public async ValueTask RemoveExpiredDraftsAsync(DateTime expriedTime, CancellationToken cancellationToken = default)
+	{
+		_ = await _dbContext.DraftRows
+			.Where(row => row.UpdatedOn < expriedTime)
+			.ExecuteDeleteAsync(cancellationToken)
+			.ConfigureAwait(false);
+	}
 
 	private static Expression MakeMemberAccess(object dataRow, JsonPointer path)
 	{
