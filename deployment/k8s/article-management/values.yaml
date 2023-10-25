@@ -15,6 +15,9 @@ imagePullSecrets:
 nameOverride: ""
 fullnameOverride: ""
 
+schedule:
+  cron: 0 23 * * *
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: false
