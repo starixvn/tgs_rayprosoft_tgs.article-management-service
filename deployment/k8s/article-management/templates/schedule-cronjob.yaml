@@ -19,6 +19,6 @@ spec:
               image: alpine/curl:8.4.0
               imagePullPolicy: IfNotPresent
               command:
-                - |
-                  curl -X POST http://{{ include "article-management.fullname" . }}/schedule/publish &&
-                  curl -X POST http://{{ include "article-management.fullname" . }}/schedule/expired-draft
+                - curl -X POST http://{{ include "article-management.fullname" . }}/schedule/publish 
+                - "&&"
+                - curl -X POST http://{{ include "article-management.fullname" . }}/schedule/expired-draft
