@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Tgs.ArticleManagement;
 using Tgs.ArticleManagement.Clients;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Tgs.ArticleManagementService.IntegrationTests;
@@ -151,5 +152,49 @@ public class ArticleTests
                     .Ignore(o => o.LocalizedArticles)
                     .IgnoreEqualsOverride())
             .IgnoreEqualsOverride()).ShouldEqual(actual);
+    }
+
+    [Fact]
+    public async Task 列表文章_最多只查詢20筆資料()
+    {
+        // Arrange
+        await using var web = ArticleManagementTestHost.Instance
+            .WithWebHostBuilder(hostBuilder => hostBuilder
+                .ConfigureLogging(logging => logging
+                    .AddXUnit(_testOutputHelper))
+                .ConfigureServices(services => services
+                    .AddHttpClientLoggingHandler()));
+
+        var httpClient = web.CreateDefaultClient(web.Services.ResolveLoggingHandler<ArticleManagementClient>());
+
+        var dbContext = web.Services.GetRequiredService<TgsContext>();
+
+        var sut = new ArticleManagementClient(httpClient);
+
+        var brandId = Guid.NewGuid();
+
+        var rows = Enumerable.Range(0, 25)
+            .Select(n => new ArticleRow
+            {
+                Id = Guid.NewGuid(),
+                BrandId = brandId,
+                Description = "desc",
+                LocalizedArticles = "{}",
+                Modifier = "system",
+                Status = nameof(ArticleStatus.Submission),
+                UpdatedOn = DateTime.UtcNow
+            })
+            .ToArray();
+
+        await dbContext.ArticleRows.AddRangeAsync(rows);
+
+        _ = await dbContext.SaveChangesAsync();
+
+        // Act
+        var actual = await sut.ListArticleFormsAsync(brandId).ToArrayAsync();
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(20, actual.Length);
     }
 }

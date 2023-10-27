@@ -97,6 +97,7 @@ internal class TgsRepository : ITgsRepository
 			.Where(row => row.BrandId == brandId
 				&& row.Status == nameof(ArticleStatus.Submission))
 			.OrderByDescending(row => row.UpdatedOn)
+			.Take(20)
 			.ToAsyncEnumerable()
 			.Select(row => new ArticleForm(
 				row.Id,
