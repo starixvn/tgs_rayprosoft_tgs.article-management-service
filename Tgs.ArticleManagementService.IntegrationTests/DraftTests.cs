@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Tgs.ArticleManagement;
 using Tgs.ArticleManagement.Clients;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Tgs.ArticleManagementService.IntegrationTests;
@@ -181,7 +182,20 @@ public class DraftTests
                 .ConfigureLogging(logging => logging
                     .AddXUnit(_testOutputHelper))
                 .ConfigureServices(services => services
-                    .AddHttpClientLoggingHandler()));
+                    .AddHttpClientLoggingHandler()
+                    .Replace(ServiceDescriptor.Singleton(sp =>
+                    {
+                        var dbContextOptionsBuilder = new DbContextOptionsBuilder<TgsContext>();
+                        _ = dbContextOptionsBuilder
+                            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                            .ConfigureWarnings(x => x.Ignore(
+                                InMemoryEventId.TransactionIgnoredWarning))
+                            .ReplaceService<
+                                IQueryTranslationPreprocessorFactory,
+                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+
+                        return new TgsContext(dbContextOptionsBuilder.Options);
+                    }))));
 
         var modifier = "tester1";
 
@@ -217,6 +231,83 @@ public class DraftTests
         Assert.Equal(modifier, actual.Modifier);
         Assert.Equal(nameof(ArticleStatus.WaitingSubmission), actual.Status);
         Assert.Equal(publishDate, actual.PublishDate);
+    }
+
+    [Fact]
+    public async Task 將草稿發行成文章_已經達到最大發行限制篇數()
+    {
+        // Arrange
+        await using var web = ArticleManagementTestHost.Instance
+            .WithWebHostBuilder(hostBuilder => hostBuilder
+                .ConfigureLogging(logging => logging
+                    .AddXUnit(_testOutputHelper))
+                .ConfigureServices(services => services
+                    .AddHttpClientLoggingHandler()
+                    .Replace(ServiceDescriptor.Singleton(sp =>
+                    {
+                        var dbContextOptionsBuilder = new DbContextOptionsBuilder<TgsContext>();
+                        _ = dbContextOptionsBuilder
+                            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+                            .ConfigureWarnings(x => x.Ignore(
+                                InMemoryEventId.TransactionIgnoredWarning))
+                            .ReplaceService<
+                                IQueryTranslationPreprocessorFactory,
+                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+
+                        return new TgsContext(dbContextOptionsBuilder.Options);
+                    }))));
+
+        var modifier = "tester1";
+
+        var httpClient = web.CreateDefaultClient(web.Services.ResolveLoggingHandler<ArticleManagementClient>());
+        httpClient.DefaultRequestHeaders.Add("Modifier", modifier);
+
+        var dbContext = web.Services.GetRequiredService<TgsContext>();
+
+        var sut = new ArticleManagementClient(httpClient);
+
+        var formId = Guid.NewGuid();
+        var publishDate = DateOnly.Parse("2023/10/23");
+        var brandId = Guid.NewGuid();
+
+        _ = await dbContext.DraftRows.AddAsync(
+            new DraftRow
+            {
+                Id = formId,
+                BrandId = brandId,
+                Description = "desc",
+                LocalizedArticles = "{}",
+                Modifier = "system",
+                Status = "Draft",
+                UpdatedOn = DateTime.Now
+            });
+
+        var currentTime = DateTime.UtcNow;
+        var rows = Enumerable.Range(0, 20)
+            .Select(n => new DraftFormViewRow
+            {
+                Id = Guid.NewGuid(),
+                BrandId = brandId,
+                Description = "desc",
+                Modifier = "system",
+                Status = nameof(ArticleStatus.Submission),
+                UpdatedOn = currentTime.AddMinutes(n)
+            })
+            .ToArray();
+
+        await dbContext.Set<DraftFormViewRow>().AddRangeAsync(rows);
+
+        _ = await dbContext.SaveChangesAsync();
+
+        // Act
+        await Assert.ThrowsAsync<ArticleManagement.Clients.PublishCountExceedLimitException>(
+            async () => await sut.PublishDraftAsync(formId, publishDate));
+        var actual = await dbContext.DraftRows.FindAsync(formId);
+
+        // Assert
+        Assert.NotNull(actual);
+        Assert.Equal(nameof(ArticleStatus.Draft), actual.Status);
+        Assert.Null(actual.PublishDate);
     }
 
     [Fact]
@@ -509,10 +600,7 @@ public class DraftTests
                         _ = dbContextOptionsBuilder
                             .UseInMemoryDatabase(Guid.NewGuid().ToString())
                             .ConfigureWarnings(x => x.Ignore(
-                                InMemoryEventId.TransactionIgnoredWarning))
-                            .ReplaceService<
-                                IQueryTranslationPreprocessorFactory,
-                                TestInMemoryQueryTranslationPreprocessorFactory<ListDraftFormsQueryTranslationPreprocessor>>();
+                                InMemoryEventId.TransactionIgnoredWarning));
 
                         return new TgsContext(dbContextOptionsBuilder.Options);
                     }))

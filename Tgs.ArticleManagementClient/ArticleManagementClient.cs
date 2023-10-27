@@ -1,5 +1,7 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Json.Patch;
 
@@ -109,7 +111,20 @@ internal class ArticleManagementClient : IArticleManagementClient
 			publishDate,
 			cancellationToken: cancellationToken)
 			.ToAsyncEnumerable()
-			.Do(response => response.EnsureSuccessStatusCode())
+			.Do(response => _ = response.StatusCode switch
+			{
+				HttpStatusCode.BadRequest => throw response.Content.ReadFromJsonAsync<JsonNode>(_SerializerOptions)
+					.ToAsyncEnumerable()
+					.Select(node => node!)
+					.Select(node => node["title"]!.GetValue<string>() switch
+					{
+						"Tgs.ArticleManagement.PublishCountExceedLimitException" => new PublishCountExceedLimitException(),
+						_ => new Exception("Unknown error.")
+					})
+					.ToEnumerable()
+					.First(),
+				_ => response.EnsureSuccessStatusCode()
+			})
 			.ToListAsync(cancellationToken: cancellationToken)
 			.ConfigureAwait(false);
 

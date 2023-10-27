@@ -11,8 +11,22 @@ internal class SetPublishDateCommandService : ICommandService<SetPublishDateComm
 		_tgsRepository = tgsRepository ?? throw new ArgumentNullException(nameof(tgsRepository));
 	}
 
-	public ValueTask ExecuteAsync(SetPublishDateCommand command, CancellationToken cancellationToken = default)
+	public async ValueTask ExecuteAsync(SetPublishDateCommand command, CancellationToken cancellationToken = default)
 	{
+		var draftForm = await _tgsRepository.GetDraftFormAsync(
+			command.FormId,
+			cancellationToken).ConfigureAwait(false);
+
+		if (draftForm is null)
+			return;
+
+		var publishedCount = await _tgsRepository.CountPublishArticleAsync(
+			draftForm.BrandId,
+			cancellationToken).ConfigureAwait(false);
+
+		if (publishedCount + 1 > 20)
+			throw new PublishCountExceedLimitException();
+
 		var modifyData = DraftForm.Empty with
 		{
 			Id = command.FormId,
@@ -21,6 +35,8 @@ internal class SetPublishDateCommandService : ICommandService<SetPublishDateComm
 			Modifier = command.Modifier
 		};
 
-		return _tgsRepository.PatchDraftAsync(modifyData, cancellationToken);
+		await _tgsRepository.PatchDraftAsync(
+			modifyData,
+			cancellationToken).ConfigureAwait(false);
 	}
 }

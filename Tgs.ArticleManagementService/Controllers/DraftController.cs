@@ -7,6 +7,7 @@ using Tgs.ArticleManagement.ApplicationServices;
 using Tgs.ArticleManagementService.Models;
 using Tgs.ArticleManagementService.ViewModels;
 using Tgs.ServiceUtility;
+using Tgs.WebApi.Toolkits;
 
 namespace Tgs.ArticleManagementService.Controllers;
 
@@ -40,15 +41,26 @@ public class DraftController : ControllerBase
 	}
 
 	[HttpPost("{formId:Guid}:publish")]
-	public ValueTask SetPublishDateAsync(
+	[ProducesResponseType(200)]
+	[ProducesResponseType(400, Type = typeof(ProblemDetails))]
+	public async ValueTask SetPublishDateAsync(
 		[FromServices] ICommandService<SetPublishDateCommand> setService,
 		[FromHeader(Name = "Modifier")] string modifier,
 		Guid formId,
 		[FromBody] DateOnly publishDate)
 	{
-		var command = new SetPublishDateCommand(formId, publishDate, modifier);
+		try
+		{
+			var command = new SetPublishDateCommand(formId, publishDate, modifier);
 
-		return setService.ExecuteAsync(command, HttpContext.RequestAborted);
+			await setService.ExecuteAsync(
+				command,
+				HttpContext.RequestAborted).ConfigureAwait(false);
+		}
+		catch (PublishCountExceedLimitException)
+		{
+			HttpContext.TransformResult(Problem(statusCode: 400, title: typeof(PublishCountExceedLimitException).FullName));
+		}
 	}
 
 	[HttpPatch("{formId:Guid}")]

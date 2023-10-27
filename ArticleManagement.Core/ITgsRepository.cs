@@ -25,4 +25,6 @@ public interface ITgsRepository
 	ValueTask RemoveExpiredDraftsAsync(DateTime expriedTime, CancellationToken cancellationToken = default);
 
 	ValueTask<int> CountDraftFormsAsync(Guid brandId, CancellationToken cancellationToken = default);
+
+	ValueTask<int> CountPublishArticleAsync(Guid brandId, CancellationToken cancellationToken = default);
 }
