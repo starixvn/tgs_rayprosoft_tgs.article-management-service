@@ -42,15 +42,14 @@ var builder = WebApplication.CreateBuilder(args);
 		.AddHealthChecks()
 		.Services
 		.AddOpenTelemetry()
-		.WithTracing(builder => builder
-			.SetResourceBuilder(ResourceBuilder.CreateDefault()
-				.AddEnvironmentVariableDetector())
+		.ConfigureResource(_ => _.AddService(builder.Configuration.GetValue<string>("Otel:ServiceName")))
+		.WithTracing(traceProviderBuilder => traceProviderBuilder
 			.AddSource("Tgs.*")
 			.AddSource("TGS.*")
 			.AddSource("Valhalla.*")
 			.AddAspNetCoreInstrumentation()
 			.AddProfileViewExporter()
-			.AddOtlpExporter())
+			.AddOtlpExporter(options => options.Endpoint = builder.Configuration.GetValue<Uri>("Otel:Collector")))
 		.WithMetrics(meterBuiler => meterBuiler
 			.SetResourceBuilder(ResourceBuilder.CreateDefault()
 				.AddEnvironmentVariableDetector())
@@ -61,7 +60,7 @@ var builder = WebApplication.CreateBuilder(args);
 		.Configure<AspNetCoreInstrumentationOptions>(options => options.Filter =
 			httpContext => !httpContext.Request.Path.HasValue
 				|| !httpContext.Request.Path.StartsWithSegments("/swagger")
-				&& !httpContext.Request.Path.StartsWithSegments("/health")
+				&& !httpContext.Request.Path.StartsWithSegments("/healthz")
 				&& !httpContext.Request.Path.StartsWithSegments("/profiler/")
 				&& !httpContext.Request.Path.StartsWithSegments("/metrics")
 				&& !new[] { "html", "ico", "png", "jpg" }.Any(
